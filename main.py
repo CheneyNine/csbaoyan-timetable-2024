@@ -2,9 +2,9 @@ import pandas as pd
 from ics import Calendar, Event
 from datetime import datetime
 
-# 读取Excel文件并解析日期列
-def read_excel(file_path):
-    return pd.read_excel(file_path, parse_dates=['夏令营报名开始', '夏令营报名结束', '夏令营结果通知', '夏令营时间开始', '夏令营时间结束'])
+# 从CSV文件读取数据并解析日期列
+def read_csv(file_path):
+    return pd.read_csv(file_path, parse_dates=['夏令营报名开始', '夏令营报名结束', '夏令营结果通知', '夏令营时间开始', '夏令营时间结束'])
 
 # 解析日期，并添加默认的年份
 def parse_date(date, default_year=2024):
@@ -16,7 +16,7 @@ def parse_date(date, default_year=2024):
     date_str = f"{default_year}-{date}"
     return datetime.strptime(date_str, "%Y-%m-%d")
 
-# 将Excel数据转换为ICS日历事件
+# 将CSV数据转换为ICS日历事件
 def create_ics_file(data, output_file):
     calendar = Calendar()
     
@@ -61,9 +61,9 @@ def create_ics_file(data, output_file):
 
 # 主函数
 def main():
-    excel_path = 'time.xlsx'  # Excel文件路径
-    ics_output_path = 'school_camps.ics'         # 输出ICS文件名
-    data = read_excel(excel_path)
+    csv_path = 'time.csv'  # CSV文件路径
+    ics_output_path = 'school_camps.ics'  # 输出ICS文件名
+    data = read_csv(csv_path)
     create_ics_file(data, ics_output_path)
     print("ICS日历文件已生成！")
 
