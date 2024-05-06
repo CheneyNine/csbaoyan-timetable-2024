@@ -1,37 +1,71 @@
-from data import AppleMaps, Course, Geo, School
+import pandas as pd
+from ics import Calendar, Event
+from datetime import datetime
 
-品学楼地图 = AppleMaps("UESTC.ics")
-立人楼A = Geo("电子科技大学清水河校区立人楼A区", 30.749454, 103.932191)
-立人楼B = Geo("电子科技大学清水河校区立人楼B区", 30.748903, 103.931567)
-# 定位信息的设置请参考 README.md
+# 读取Excel文件并解析日期列
+def read_excel(file_path):
+    return pd.read_excel(file_path, parse_dates=['夏令营报名开始', '夏令营报名结束', '夏令营结果通知', '夏令营时间开始', '夏令营时间结束'])
 
-school = School(
-    duration=45, # 每节课时间为 45 分钟
-    timetable=[
-        (8, 30), # 上午第一节课时间为 8:30 至 9:15
-        (9, 20),
-        (10, 20),
-        (11, 10),
-        (14, 30), # 下午第一节课时间为下午 2:30 至 3:15
-        (15, 20),
-        (16, 20),
-        (17, 10),
-        (19, 30),
-        (20, 20),
-        (21, 10)
-    ],
-    start=(2023, 8, 28), # 2023 年 8 月 28 日是开学第一周星期一
-    courses=[
-        Course("最优化理论与应用", "张三", "品学楼B107", 品学楼地图["品学楼B"], 1, Course.week(1, 13), [3, 4]),
-            # 张三老师的「最优化理论与应用」会在第 1 至 13 周的星期一第 3-4 节在 品学楼B107 教室上课
-        Course("新时代中国特色社会主义理论与实践", "李四", "立人楼B417", 立人楼B, 6, Course.week(1, 9) + [11] , [7, 8]),
-            # 李四老师的「新时代中国特色社会主义理论与实践」会在第 1 至 9 周和第 11 周的的星期六第 7-8 节在 立人楼B417 教室上课
-        Course("雷达与电子对抗系统", "王五", "立人楼A417", 立人楼A, 2, Course.week(1, 9), Course.week(9, 11)),
-            # 王五老师的「雷达与电子对抗系统」会在第 1 至 9 周的星期二第 9-11 节在 立人楼A417 教室上课
-        Course("信号检测与估计", "赵六", "品学楼C411", "电子科技大学清水河校区品学楼C区", 4, Course.odd_week(1, 11), [5, 6]),
-            # 赵六老师的「信号检测与估计」会在第 1 至 11 的奇数周的星期四第 5-6 节在 品学楼C411 教室上课
-    ]
-)
+# 解析日期，并添加默认的年份
+def parse_date(date, default_year=2024):
+    if pd.isnull(date):
+        return None
+    if isinstance(date, pd.Timestamp):
+        return datetime.combine(date, datetime.min.time())
+    # 如果日期已是datetime.date类型，直接组合
+    date_str = f"{default_year}-{date}"
+    return datetime.strptime(date_str, "%Y-%m-%d")
 
-with open("课表.ics", "w") as w:
-    w.write(school.generate())
+# 将Excel数据转换为ICS日历事件
+def create_ics_file(data, output_file):
+    calendar = Calendar()
+    
+    for index, row in data.iterrows():
+        if pd.isnull(row['夏令营报名开始']) or pd.isnull(row['夏令营报名结束']):
+            print(f"Skipping row {index + 1}: Missing necessary date information.")
+            continue
+        
+        # 创建一个夏令营报名事件
+        registration_event = Event()
+        registration_event.name = f"{row['学校名字']} 夏令营报名"
+        registration_event.begin = parse_date(row['夏令营报名开始'])
+        registration_event.end = parse_date(row['夏令营报名结束'])
+        registration_event.description = f"夏令营报名链接: {row['url']}"
+        registration_event.location = row['学校名字']
+        calendar.events.add(registration_event)
+
+        # 检查其他日期
+        if pd.isnull(row['夏令营结果通知']):
+            print(f"Notice date missing in row {index + 1}. Skipping notification event.")
+        else:
+            # 创建一个夏令营结果通知事件
+            notification_event = Event()
+            notification_event.name = f"{row['学校名字']} 夏令营结果通知"
+            notification_event.begin = parse_date(row['夏令营结果通知'])
+            notification_event.description = "夏令营结果将会在今天通知。"
+            notification_event.location = row['学校名字']
+            calendar.events.add(notification_event)
+
+        # 创建一个夏令营活动
+        camp_event = Event()
+        camp_event.name = f"{row['学校名字']} 夏令营活动"
+        camp_event.begin = parse_date(row['夏令营时间开始'])
+        camp_event.end = parse_date(row['夏令营时间结束'])
+        camp_event.description = "参加夏令营活动。"
+        camp_event.location = row['学校名字']
+        calendar.events.add(camp_event)
+        
+    # 保存ICS文件
+    with open(output_file, 'w') as my_file:
+        my_file.writelines(calendar)
+
+# 主函数
+def main():
+    excel_path = 'time.xlsx'  # Excel文件路径
+    ics_output_path = 'school_camps.ics'         # 输出ICS文件名
+    data = read_excel(excel_path)
+    create_ics_file(data, ics_output_path)
+    print("ICS日历文件已生成！")
+
+if __name__ == "__main__":
+    main()
