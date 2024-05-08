@@ -12,7 +12,6 @@ def parse_date(date, default_year=2024):
         return None
     if isinstance(date, pd.Timestamp):
         return datetime.combine(date, datetime.min.time())
-    # 如果日期已是datetime.date类型，直接组合
     date_str = f"{default_year}-{date}"
     return datetime.strptime(date_str, "%Y-%m-%d")
 
@@ -32,18 +31,17 @@ def create_ics_file(data, output_file):
         registration_event.end = parse_date(row['夏令营报名结束'])
         registration_event.description = f"夏令营报名链接: {row['url']}"
         registration_event.location = row['学校名字']
+        registration_event.transparent = True  # 设置事件透明度为透明
         calendar.events.add(registration_event)
 
-        # 检查其他日期
-        if pd.isnull(row['夏令营结果通知']):
-            print(f"Notice date missing in row {index + 1}. Skipping notification event.")
-        else:
+        if not pd.isnull(row['夏令营结果通知']):
             # 创建一个夏令营结果通知事件
             notification_event = Event()
             notification_event.name = f"{row['学校名字']} 夏令营结果通知"
             notification_event.begin = parse_date(row['夏令营结果通知'])
             notification_event.description = "夏令营结果将会在今天通知。"
             notification_event.location = row['学校名字']
+            notification_event.transparent = True
             calendar.events.add(notification_event)
 
         # 创建一个夏令营活动
@@ -53,11 +51,12 @@ def create_ics_file(data, output_file):
         camp_event.end = parse_date(row['夏令营时间结束'])
         camp_event.description = "参加夏令营活动。"
         camp_event.location = row['学校名字']
+        camp_event.transparent = True
         calendar.events.add(camp_event)
         
     # 保存ICS文件
     with open(output_file, 'w') as my_file:
-        my_file.writelines(calendar)
+        my_file.writelines(str(calendar))
 
 # 主函数
 def main():
