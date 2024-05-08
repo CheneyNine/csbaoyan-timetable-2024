@@ -1,6 +1,7 @@
 import pandas as pd
-from ics import Calendar, Event
-from datetime import datetime
+from icalendar import Calendar, Event
+from datetime import datetime, timedelta
+import pytz
 
 # 从CSV文件读取数据并解析日期列
 def read_csv(file_path):
@@ -11,52 +12,34 @@ def parse_date(date, default_year=2024):
     if pd.isnull(date):
         return None
     if isinstance(date, pd.Timestamp):
-        return datetime.combine(date, datetime.min.time())
+        return datetime(default_year, date.month, date.day)
     date_str = f"{default_year}-{date}"
     return datetime.strptime(date_str, "%Y-%m-%d")
 
 # 将CSV数据转换为ICS日历事件
 def create_ics_file(data, output_file):
     calendar = Calendar()
-    
+    calendar.add('prodid', '-//Apple Inc.//macOS 14.4.1//EN')
+    calendar.add('version', '2.0')
+    calendar.add('calscale', 'GREGORIAN')
+    calendar.add('method', 'PUBLISH')
+
     for index, row in data.iterrows():
         if pd.isnull(row['夏令营报名开始']) or pd.isnull(row['夏令营报名结束']):
             print(f"Skipping row {index + 1}: Missing necessary date information.")
             continue
-        
-        # 创建一个夏令营报名事件
-        registration_event = Event()
-        registration_event.name = f"{row['学校名字']} 夏令营报名"
-        registration_event.begin = parse_date(row['夏令营报名开始'])
-        registration_event.end = parse_date(row['夏令营报名结束'])
-        registration_event.description = f"夏令营报名链接: {row['url']}"
-        registration_event.location = row['学校名字']
-        registration_event.transparent = True  # 设置事件透明度为透明
-        calendar.events.add(registration_event)
 
-        if not pd.isnull(row['夏令营结果通知']):
-            # 创建一个夏令营结果通知事件
-            notification_event = Event()
-            notification_event.name = f"{row['学校名字']} 夏令营结果通知"
-            notification_event.begin = parse_date(row['夏令营结果通知'])
-            notification_event.description = "夏令营结果将会在今天通知。"
-            notification_event.location = row['学校名字']
-            notification_event.transparent = True
-            calendar.events.add(notification_event)
+        event = Event()
+        event.add('summary', f"{row['学校名字']} 夏令营报名")
+        event.add('dtstart', parse_date(row['夏令营报名开始']))
+        event.add('dtend', parse_date(row['夏令营报名结束']) + timedelta(days=1))
+        event.add('dtstamp', datetime.now(pytz.utc))
+        event.add('transp', 'TRANSPARENT')
+        event.add('uid', f"{index}@example.com")
+        calendar.add_component(event)
 
-        # 创建一个夏令营活动
-        camp_event = Event()
-        camp_event.name = f"{row['学校名字']} 夏令营活动"
-        camp_event.begin = parse_date(row['夏令营时间开始'])
-        camp_event.end = parse_date(row['夏令营时间结束'])
-        camp_event.description = "参加夏令营活动。"
-        camp_event.location = row['学校名字']
-        camp_event.transparent = True
-        calendar.events.add(camp_event)
-        
-    # 保存ICS文件
-    with open(output_file, 'w') as my_file:
-        my_file.writelines(str(calendar))
+    with open(output_file, 'wb') as my_file:
+        my_file.write(calendar.to_ical())
 
 # 主函数
 def main():
